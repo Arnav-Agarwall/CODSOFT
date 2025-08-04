@@ -1,0 +1,77 @@
+import pandas as pd
+import logging
+import re
+import string
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import LabelEncoder
+from sklearn.multiclass import OneVsRestClassifier
+
+# Logging
+logging.basicConfig(level=logging.INFO)
+
+# Clean text
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r"\d+", "", text)
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+# Load dataset
+logging.info("Loading data...")
+data = []
+with open("D:/codsoft/Movie Genre Predictor/Genre Prediction Model/train_data.txt", "r", encoding="utf-8") as f:
+    for line in f:
+        parts = line.strip().split(" ::: ")
+        if len(parts) == 4:
+            _, title, genre, plot = parts
+            data.append({"title": title, "genre": genre, "plot": plot})
+
+df = pd.DataFrame(data)
+
+# Combine title + plot
+df['combined'] = (df['title'] + " " + df['plot']).apply(preprocess_text)
+
+# Encode genre
+label_encoder = LabelEncoder()
+df['genre_encoded'] = label_encoder.fit_transform(df['genre'])
+
+# Train/test split
+X_train, X_test, y_train, y_test = train_test_split(df['combined'], df['genre_encoded'], test_size=0.2, random_state=42)
+
+# Pipeline
+pipeline = Pipeline([
+    ('tfidf', TfidfVectorizer(
+        stop_words='english',
+        max_df=0.8,
+        min_df=3,
+        ngram_range=(1, 2),
+        max_features=20000
+    )),
+    ('clf', OneVsRestClassifier(
+        LogisticRegression(
+            solver='liblinear',
+            max_iter=5000,
+            class_weight='balanced'
+        )
+    ))
+])
+
+# Train
+logging.info("Training model...")
+pipeline.fit(X_train, y_train)
+
+# Evaluate
+y_pred = pipeline.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+logging.info(f"Accuracy: {accuracy:.4f}")
+
+y_test_labels = label_encoder.inverse_transform(y_test)
+y_pred_labels = label_encoder.inverse_transform(y_pred)
+
+print("Classification Report:")
+print(classification_report(y_test_labels, y_pred_labels))
