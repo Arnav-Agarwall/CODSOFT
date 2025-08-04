@@ -25,6 +25,3 @@ A machine learning project that predicts the **genre** of a movie based on its *
   - Class-weight balanced to handle class imbalance
 
 ---
-
-## 📁 Project Structure
-
